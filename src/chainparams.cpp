@@ -105,7 +105,7 @@ public:
         pchMessageStart[1] = 0x04;
         pchMessageStart[2] = 0x03;
         pchMessageStart[3] = 0x02;
-        vAlertPubKey = ParseHex("");
+        vAlertPubKey = ParseHex("04153e885b685b8786ea291a8e71c6e489cf993b7d7f5c96b15535292522b467f4dab25e29ccd1c5bdafc86a285fdabb6d34e437c7dfa958596bcc9089d2e28032");
         nDefaultPort = 15002;
         nRPCPort = 15001;
         strDataDir = "testnet";
