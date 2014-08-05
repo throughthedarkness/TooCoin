@@ -146,7 +146,6 @@ OBJS= \
     obj/txdb.o \
     obj/chainparams.o \
     obj/scrypt.o \
-    obj/scrypt-sse2.o \
     obj/blake.o \
     obj/bmw.o \
     obj/groestl.o \
@@ -159,11 +158,18 @@ OBJS= \
     obj/cubehash.o \
     obj/shavite.o
 
-all: myriadcoind
+ifdef USE_SSE2
+DEFS += -DUSE_SSE2
+OBJS_SSE2= obj/scrypt-sse2.o
+OBJS += $(OBJS_SSE2)
+endif
 
-test check: test_myriadcoin FORCE
-	./test_myriadcoin
 
+all: neoscoind
+
+test check: test_neoscoin FORCE
+	./test_neoscoin
+    
 #
 # LevelDB support
 #
@@ -197,7 +203,7 @@ obj/%.o: %.c
 	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
 	  rm -f $(@:%.o=%.d)
       
-myriadcoind: $(OBJS:obj/%=obj/%)
+neoscoind: $(OBJS:obj/%=obj/%)
 	$(LINK) $(xCXXFLAGS) -o $@ $^ $(xLDFLAGS) $(LIBS)
 
 TESTOBJS := $(patsubst test/%.cpp,obj-test/%.o,$(wildcard test/*.cpp))
@@ -209,11 +215,11 @@ obj-test/%.o: test/%.cpp
 	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
 	  rm -f $(@:%.o=%.d)
 
-test_myriadcoin: $(TESTOBJS) $(filter-out obj/init.o obj/myriadcoind.o,$(OBJS:obj/%=obj/%))
+test_neoscoin: $(TESTOBJS) $(filter-out obj/init.o obj/neoscoind.o,$(OBJS:obj/%=obj/%))
 	$(LINK) $(xCXXFLAGS) -o $@ $(LIBPATHS) $^ $(TESTLIBS) $(xLDFLAGS) $(LIBS)
 
 clean:
-	-rm -f myriadcoind test_myriadcoin
+	-rm -f neoscoind test_neoscoin
 	-rm -f obj/*.o
 	-rm -f obj-test/*.o
 	-rm -f obj/*.P

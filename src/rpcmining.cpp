@@ -91,10 +91,8 @@ Value getmininginfo(const Array& params, bool fHelp)
     obj.push_back(Pair("pow_algo",           GetAlgoName(miningAlgo)));
     obj.push_back(Pair("difficulty",         (double)GetDifficulty(NULL, miningAlgo)));
     obj.push_back(Pair("difficulty_sha256d", (double)GetDifficulty(NULL, ALGO_SHA256D)));
-    obj.push_back(Pair("difficulty_scrypt",  (double)GetDifficulty(NULL, ALGO_SCRYPT)));
-    obj.push_back(Pair("difficulty_groestl", (double)GetDifficulty(NULL, ALGO_GROESTL)));
-    obj.push_back(Pair("difficulty_skein",   (double)GetDifficulty(NULL, ALGO_SKEIN)));
-    obj.push_back(Pair("difficulty_qubit",   (double)GetDifficulty(NULL, ALGO_QUBIT)));
+    obj.push_back(Pair("difficulty_x11",     (double)GetDifficulty(NULL, ALGO_X11)));
+    obj.push_back(Pair("difficulty_blake",   (double)GetDifficulty(NULL, ALGO_BLAKE)));
     obj.push_back(Pair("errors",             GetWarnings("statusbar")));
     obj.push_back(Pair("generate",           GetBoolArg("-gen", false)));
     obj.push_back(Pair("genproclimit",       (int)GetArg("-genproclimit", -1)));
@@ -118,10 +116,10 @@ Value getwork(const Array& params, bool fHelp)
             "If [data] is specified, tries to solve the block and returns true if it was successful.");
 
     if (vNodes.empty())
-        throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Myriadcoin is not connected!");
+        throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "NeosCoin is not connected!");
 
     if (IsInitialBlockDownload())
-        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Myriadcoin is downloading blocks...");
+        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "NeosCoin is downloading blocks...");
 
     typedef map<uint256, pair<CBlock*, CScript> > mapNewBlock_t;
     static mapNewBlock_t mapNewBlock;    // FIXME: thread safety
@@ -259,10 +257,10 @@ Value getblocktemplate(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mode");
 
     if (vNodes.empty())
-        throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Myriadcoin is not connected!");
+        throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "NeosCoin is not connected!");
 
     if (IsInitialBlockDownload())
-        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Myriadcoin is downloading blocks...");
+        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "NeosCoin is downloading blocks...");
 
     // Update block
     static unsigned int nTransactionsUpdatedLast;

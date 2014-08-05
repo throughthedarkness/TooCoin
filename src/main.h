@@ -26,7 +26,7 @@ class CNode;
 struct CBlockIndexWorkComparator;
 
 /** The maximum allowed size for a serialized block, in bytes (network rule) */
-static const unsigned int MAX_BLOCK_SIZE = 1000000;
+static const unsigned int MAX_BLOCK_SIZE = 2000000;
 /** The maximum size for mined blocks */
 static const unsigned int MAX_BLOCK_SIZE_GEN = MAX_BLOCK_SIZE/2;
 /** The maximum size for transactions we're willing to relay/mine */
@@ -44,7 +44,7 @@ static const unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
 /** Fake height value used in CCoins to signify they are only in the memory pool (since 0.8) */
 static const unsigned int MEMPOOL_HEIGHT = 0x7FFFFFFF;
 /** No amount larger than this (in satoshi) is valid */
-static const int64 MAX_MONEY = 2000000000 * COIN;
+static const int64 MAX_MONEY = 21000000 * COIN;
 inline bool MoneyRange(int64 nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 /** Coinbase transaction outputs can only be spent after this number of new blocks (network rule) */
 static const int COINBASE_MATURITY = 100;
@@ -54,6 +54,8 @@ static const unsigned int LOCKTIME_THRESHOLD = 500000000; // Tue Nov  5 00:53:20
 static const int MAX_SCRIPTCHECK_THREADS = 16;
 /** Default amount of block size reserved for high-priority transactions (in bytes) */
 static const int DEFAULT_BLOCK_PRIORITY_SIZE = 27000;
+static const int DIFF_SWITCH_BLOCK = 1;
+static const int DIFF_SWITCH_BLOCK_2 = 2;
 #ifdef USE_UPNP
 static const int fHaveUPnP = true;
 #else
@@ -293,7 +295,7 @@ unsigned int GetLegacySigOpCount(const CTransaction& tx);
 
 /** Count ECDSA signature operations in pay-to-script-hash inputs.
 
-    @param[in] mapInputs	Map of previous transactions that have outputs we're spending
+    @param[in] mapInputs    Map of previous transactions that have outputs we're spending
     @return maximum number of sigops required to validate this transaction's inputs
     @see CTransaction::FetchInputs
  */
@@ -304,7 +306,7 @@ inline bool AllowFree(double dPriority)
 {
     // Large (in bytes) low-priority (new, small-coin) transactions
     // need a fee.
-    return dPriority > COIN * 144 / 250;
+    return dPriority > COIN * 960 / 250;
 }
 
 // Check whether all inputs of this transaction are valid (no double spends, scripts & sigs, amounts)
@@ -843,14 +845,10 @@ public:
             case ALGO_SHA256D:
                 return 1; 
             // work factor = absolute work ratio * optimisation factor
-            case ALGO_SCRYPT:
-                return 1024 * 4;
-            case ALGO_GROESTL:
-                return 64 * 8;
-            case ALGO_SKEIN:
-                return 4 * 6;
-            case ALGO_QUBIT:
+            case ALGO_X11:
                 return 128 * 8;
+            case ALGO_BLAKE:
+                return 4 * 8;
             default:
                 return 1;
         }
@@ -860,6 +858,17 @@ public:
     {
         CBigNum bnRes;
         bnRes = GetBlockWork() * GetAlgoWorkFactor();
+        
+
+        while (bnRes < 100000)
+        {
+            bnRes = bnRes * 2;
+        }
+        while (bnRes > 100000)
+        {
+            bnRes = bnRes / 2;
+        }
+       
         return bnRes;
     }
     
@@ -1258,8 +1267,8 @@ public:
         Note that lightweight clients may not know anything besides the hash of previous transactions,
         so may not be able to calculate this.
 
-        @param[in] tx	transaction for which we are checking input total
-        @return	Sum of value of all inputs (scriptSigs)
+        @param[in] tx   transaction for which we are checking input total
+        @return Sum of value of all inputs (scriptSigs)
         @see CTransaction::FetchInputs
      */
     int64 GetValueIn(const CTransaction& tx);

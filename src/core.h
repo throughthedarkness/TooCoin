@@ -10,30 +10,26 @@
 #include "script.h"
 #include "scrypt.h"
 #include "hashgroestl.h"
-#include "hashskein.h"
-#include "hashqubit.h"
+#include "hashx11.h"
+#include "hashblake.h"
 
 #include <stdio.h>
 
 enum { 
     ALGO_SHA256D = 0, 
-    ALGO_SCRYPT  = 1, 
-    ALGO_GROESTL = 2,
-    ALGO_SKEIN   = 3,
-    ALGO_QUBIT   = 4,
+    ALGO_X11     = 1,
+    ALGO_BLAKE   = 2,
     NUM_ALGOS };
 
 enum
 {
     // primary version
-    BLOCK_VERSION_DEFAULT        = 2,
+    BLOCK_VERSION_DEFAULT        = 0,
 
     // algo
     BLOCK_VERSION_ALGO           = (7 << 9),
-    BLOCK_VERSION_SCRYPT         = (1 << 9),
-    BLOCK_VERSION_GROESTL        = (2 << 9),
-    BLOCK_VERSION_SKEIN          = (3 << 9),
-    BLOCK_VERSION_QUBIT          = (4 << 9),
+    BLOCK_VERSION_X11            = (1 << 9),
+    BLOCK_VERSION_BLAKE          = (2 << 9),
 };
 
 inline int GetAlgo(int nVersion)
@@ -42,14 +38,10 @@ inline int GetAlgo(int nVersion)
     {
         case 0:
             return ALGO_SHA256D;
-        case BLOCK_VERSION_SCRYPT:
-            return ALGO_SCRYPT;
-        case BLOCK_VERSION_GROESTL:
-            return ALGO_GROESTL;
-        case BLOCK_VERSION_SKEIN:
-            return ALGO_SKEIN;
-        case BLOCK_VERSION_QUBIT:
-            return ALGO_QUBIT;
+        case BLOCK_VERSION_X11:
+            return ALGO_X11;
+        case BLOCK_VERSION_BLAKE:
+            return ALGO_BLAKE;
     }
     return ALGO_SHA256D;
 }
@@ -60,14 +52,10 @@ inline std::string GetAlgoName(int Algo)
     {
         case ALGO_SHA256D:
             return std::string("sha256d");
-        case ALGO_SCRYPT:
-            return std::string("scrypt");
-        case ALGO_GROESTL:
-            return std::string("groestl");
-        case ALGO_SKEIN:
-            return std::string("skein");
-        case ALGO_QUBIT:
-            return std::string("qubit");
+        case ALGO_X11:
+            return std::string("x11");
+        case ALGO_BLAKE:
+            return std::string("blake");
     }
     return std::string("unknown");       
 }
@@ -657,19 +645,10 @@ public:
         {
             case ALGO_SHA256D:
                 return GetHash();
-            case ALGO_SCRYPT:
-            {
-                uint256 thash;
-                // Caution: scrypt_1024_1_1_256 assumes fixed length of 80 bytes
-                scrypt_1024_1_1_256(BEGIN(nVersion), BEGIN(thash));
-                return thash;
-            }
-            case ALGO_GROESTL:
-                return HashGroestl(BEGIN(nVersion), END(nNonce));
-            case ALGO_SKEIN:
-                return HashSkein(BEGIN(nVersion), END(nNonce));
-            case ALGO_QUBIT:
-                return HashQubit(BEGIN(nVersion), END(nNonce));
+            case ALGO_X11:
+                return HashX11(BEGIN(nVersion), END(nNonce));
+            case ALGO_BLAKE:
+                return HashBlake(BEGIN(nVersion), END(nNonce));
         }
         return GetHash();
     }

@@ -2,7 +2,7 @@
 // Copyright (c) 2009-2013 The Bitcoin developers
 // Copyright (c) 2013-2014 The Zetacoin developers
 // Copyright (c) 2014 The Huntercoin developers
-// Copyright (c) 2014 The Myriadcoin developers
+// Copyright (c) 2014 The NeosCoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -18,6 +18,8 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
+#include <boost/random/mersenne_twister.hpp>
+#include <boost/random/uniform_int_distribution.hpp>
 #include "scrypt.h"
 
 using namespace std;
@@ -54,9 +56,9 @@ unsigned int nCoinCacheSize = 5000;
 bool fHaveGUI = false;
 
 /** Fees smaller than this (in satoshi) are considered zero fee (for transaction creation) */
-int64 CTransaction::nMinTxFee = 10000;  // Override with -mintxfee
+int64 CTransaction::nMinTxFee = 20000;  // Override with -mintxfee
 /** Fees smaller than this (in satoshi) are considered zero fee (for relaying) */
-int64 CTransaction::nMinRelayTxFee = 10000;
+int64 CTransaction::nMinRelayTxFee = 20000;
 
 CMedianFilter<int> cPeerBlockCounts(8, 0); // Amount of blocks that other nodes claim to have
 
@@ -69,7 +71,7 @@ map<uint256, map<uint256, CDataStream*> > mapOrphanTransactionsByPrev;
 // Constant stuff for coinbase transactions we create:
 CScript COINBASE_FLAGS;
 
-const string strMessageMagic = "Myriadcoin Signed Message:\n";
+const string strMessageMagic = "NeosCoin Signed Message:\n";
 
 double dHashesPerSec = 0.0;
 int64 nHPSTimerStart = 0;
@@ -79,7 +81,7 @@ int64 nTransactionFee = 0;
 
 int miningAlgo = ALGO_SHA256D;
 
-
+int nTargetSpacingSwitch = 450;
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -1269,38 +1271,36 @@ const CBlockIndex* GetLastBlockIndexForAlgo(const CBlockIndex* pindex, int algo)
     }
 }
 
-static const int64 nStartSubsidy = 1000 * COIN;
-static const int64 nMinSubsidy = 1 * COIN;
+static const int64 nStartSubsidy = 50 * COIN;
+static const int64 nMinSubsidy = .0625 * COIN;
 
 int64 static GetBlockValue(int nHeight, int64 nFees)
 {
     int64 nSubsidy = nStartSubsidy;
-
-    // Mining phase: Subsidy is cut in half every SubsidyHalvingInterval
-    nSubsidy >>= (nHeight / Params().SubsidyHalvingInterval());
     
-    // Inflation phase: Subsidy reaches minimum subsidy
-    // Network is rewarded for transaction processing with transaction fees and 
-    // the inflationary subsidy
-    if (nSubsidy < nMinSubsidy)
-    {
-        nSubsidy = nMinSubsidy;
-    }
-
+    if(nHeight == 1) {nSubsidy = 2100000 * COIN;}
+    nSubsidy >>= (nHeight / Params().SubsidyHalvingInterval());
+    if (nSubsidy < nMinSubsidy){nSubsidy = nMinSubsidy;}    
     return nSubsidy + nFees;
+    
 }
 
-static const int64 nTargetTimespan = 150; // 2.5 minutes (NUM_ALGOS * 30 seconds)
-static const int64 nTargetSpacing = 150; // 2.5 minutes (NUM_ALGOS * 30 seconds)
+static const int64 nTargetTimespan = 300; 
+static const int64 nTargetSpacing = 300; 
+
+static const int64 nTargetTimespanNEW = 300;
+static const int64 nTargetSpacingNEW = 300; 
+
 static const int64 nInterval = 1; // retargets every blocks
-
 static const int64 nAveragingInterval = 10; // 10 blocks
-static const int64 nAveragingTargetTimespan = nAveragingInterval * nTargetSpacing; // 25 minutes
+static const int64 nAveragingTargetTimespan = nAveragingInterval * nTargetSpacing; 
+static const int64 nAveragingTargetTimespanNEW = nAveragingInterval * nTargetSpacingNEW; 
 
-static const int64 nMaxAdjustDown = 4; // 4% adjustment down
-static const int64 nMaxAdjustUp = 2; // 2% adjustment up
+static const int64 nMaxAdjustDown = 25; 
+static const int64 nMaxAdjustUp = 25; 
 
 static const int64 nTargetTimespanAdjDown = nTargetTimespan * (100 + nMaxAdjustDown) / 100;
+static const int64 nTargetTimespanAdjDownNEW = nTargetTimespanNEW * (100 + nMaxAdjustDown) / 100;
 
 //
 // minimum amount of work that could possibly be required nTime after
@@ -1334,7 +1334,11 @@ unsigned int ComputeMinWork(unsigned int nBase, int64 nTime)
 
 static const int64 nMinActualTimespan = nAveragingTargetTimespan * (100 - nMaxAdjustUp) / 100;
 static const int64 nMaxActualTimespan = nAveragingTargetTimespan * (100 + nMaxAdjustDown) / 100;
+
+static const int64 nMinActualTimespanNEW = nAveragingTargetTimespanNEW * (100 - nMaxAdjustUp) / 100;
+static const int64 nMaxActualTimespanNEW = nAveragingTargetTimespanNEW * (100 + nMaxAdjustDown) / 100;
     
+
 unsigned int static GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, int algo)
 {
     unsigned int nProofOfWorkLimit = Params().ProofOfWorkLimit(algo).GetCompact();
@@ -1343,18 +1347,29 @@ unsigned int static GetNextWorkRequired(const CBlockIndex* pindexLast, const CBl
     if (pindexLast == NULL)
         return nProofOfWorkLimit;
     
+    const CBlockIndex* pindex = pindexLast;
+    
     // Testnet
     if (TestNet())
     {
+
         // Special difficulty rule for testnet:
         // If the new block's timestamp is more than 2* 10 minutes
         // then allow mining of a min-difficulty block.
-        if (pblock->nTime > pindexLast->nTime + nTargetSpacing*2)
+        if(pindex->nHeight < DIFF_SWITCH_BLOCK_2)
+        {
+            nTargetSpacingSwitch = nTargetSpacing;
+        }
+        else
+        {
+            nTargetSpacingSwitch = nTargetSpacingNEW;
+        }
+        if (pblock->nTime > pindexLast->nTime + nTargetSpacingSwitch*2)
             return nProofOfWorkLimit;
         else
         {
             // Return the last non-special-min-difficulty-rules-block
-            const CBlockIndex* pindex = pindexLast;
+            
             while (pindex->pprev && pindex->nHeight % nInterval != 0 && pindex->nBits == nProofOfWorkLimit)
                 pindex = pindex->pprev;
             return pindex->nBits;
@@ -1378,28 +1393,49 @@ unsigned int static GetNextWorkRequired(const CBlockIndex* pindexLast, const CBl
     // Limit adjustment step
     int64 nActualTimespan = pindexPrev->GetBlockTime() - pindexFirst->GetBlockTime();
     printf("  nActualTimespan = %"PRI64d"  before bounds\n", nActualTimespan);
-    if (nActualTimespan < nMinActualTimespan)
-        nActualTimespan = nMinActualTimespan;
-    if (nActualTimespan > nMaxActualTimespan)
-        nActualTimespan = nMaxActualTimespan;
+    if(pindex->nHeight < DIFF_SWITCH_BLOCK_2)
+        {
+            if (nActualTimespan < nMinActualTimespan)
+            nActualTimespan = nMinActualTimespan;
+            if (nActualTimespan > nMaxActualTimespan)
+            nActualTimespan = nMaxActualTimespan;
+        }
+        else
+        {
+            if (nActualTimespan < nMinActualTimespanNEW)
+            nActualTimespan = nMinActualTimespanNEW;
+            if (nActualTimespan > nMaxActualTimespanNEW)
+            nActualTimespan = nMaxActualTimespanNEW;
+        }
+    
 
     // Retarget
     CBigNum bnNew;
     bnNew.SetCompact(pindexPrev->nBits);
     bnNew *= nActualTimespan;
+    if(pindex->nHeight < DIFF_SWITCH_BLOCK_2)
     bnNew /= nAveragingTargetTimespan;
+    else
+    bnNew /= nAveragingTargetTimespanNEW;
 
     if (bnNew > Params().ProofOfWorkLimit(algo))
         bnNew = Params().ProofOfWorkLimit(algo);
 
     /// debug print
     printf("GetNextWorkRequired RETARGET\n");
+
+    if(pindex->nHeight < DIFF_SWITCH_BLOCK_2)
     printf("nTargetTimespan = %"PRI64d"    nActualTimespan = %"PRI64d"\n", nAveragingTargetTimespan, nActualTimespan);
+    else
+    printf("nTargetTimespan = %"PRI64d"    nActualTimespan = %"PRI64d"\n", nAveragingTargetTimespanNEW, nActualTimespan);
+
     printf("Before: %08x  %s\n", pindexPrev->nBits, CBigNum().SetCompact(pindexPrev->nBits).getuint256().ToString().c_str());
     printf("After:  %08x  %s\n", bnNew.GetCompact(), bnNew.getuint256().ToString().c_str());
 
     return bnNew.GetCompact();
 }
+
+
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits, int algo)
 {
@@ -1901,6 +1937,13 @@ bool ConnectBlock(CBlock& block, CValidationState& state, CBlockIndex* pindex, C
     int64 nTime = GetTimeMicros() - nStart;
     if (fBenchmark)
         printf("- Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin)\n", (unsigned)block.vtx.size(), 0.001 * nTime, 0.001 * nTime / block.vtx.size(), nInputs <= 1 ? 0 : 0.001 * nTime / (nInputs-1));
+
+    uint256 prevHash = 0;
+        if(pindex->pprev)
+        {
+            prevHash = pindex->pprev->GetBlockHash();
+           
+        }
 
     if (GetValueOut(block.vtx[0]) > GetBlockValue(pindex->nHeight, nFees))
         return state.DoS(100, error("ConnectBlock() : coinbase pays too much (actual=%"PRI64d" vs limit=%"PRI64d")", GetValueOut(block.vtx[0]), GetBlockValue(pindex->nHeight, nFees)));
@@ -4331,26 +4374,39 @@ CBlockTemplate* CreateNewBlock(CReserveKey& reservekey, int algo)
 
     // Set block version
     pblock->nVersion = BLOCK_VERSION_DEFAULT;
-    switch (algo)
-    {
-        case ALGO_SHA256D:
-            break;
-        case ALGO_SCRYPT:
-            pblock->nVersion |= BLOCK_VERSION_SCRYPT;
-            break;
-        case ALGO_GROESTL:
-            pblock->nVersion |= BLOCK_VERSION_GROESTL;
-            break;
-        case ALGO_SKEIN:
-            pblock->nVersion |= BLOCK_VERSION_SKEIN;
-            break;
-        case ALGO_QUBIT:
-            pblock->nVersion |= BLOCK_VERSION_QUBIT;
-            break;
-        default:
-            error("CreateNewBlock: bad algo");
-            return NULL;
-    }
+    if (pindexBest->nHeight < DIFF_SWITCH_BLOCK)
+        {
+             switch (algo)
+            {
+                case ALGO_SHA256D:
+                    break;
+                default:
+                    error("CreateNewBlock: bad algo");
+                    return NULL;
+            }
+            
+        }
+        else
+        {
+            switch (algo)
+            {
+                case ALGO_SHA256D:
+                    break;
+                case ALGO_X11:
+                    pblock->nVersion |= BLOCK_VERSION_X11;
+                    break;
+                case ALGO_BLAKE:
+                    pblock->nVersion |= BLOCK_VERSION_BLAKE;
+                    break;
+                default:
+                    error("CreateNewBlock: bad algo");
+                    return NULL;
+            }
+            
+        }
+            
+        
+    
     
     // Create coinbase tx
     CTransaction txNew;
@@ -4668,7 +4724,7 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
     uint256 hashBlock = pblock->GetHash();
 
     //// debug print
-    printf("MyriadcoinMiner:\n");
+    printf("NeosCoinMiner:\n");
     printf("proof-of-work found\n  block-hash: %s\n  pow-hash: %s\n  target: %s\n", 
         hashBlock.GetHex().c_str(), 
         hashPoW.GetHex().c_str(), 
@@ -4680,7 +4736,7 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
     {
         LOCK(cs_main);
         if (pblock->hashPrevBlock != hashBestChain)
-            return error("MyriadcoinMiner : generated block is stale");
+            return error("NeosCoinMiner : generated block is stale");
 
         // Remove key from key pool
         reservekey.KeepKey();
@@ -4694,7 +4750,7 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
         // Process this block the same as if we had received it from another node
         CValidationState state;
         if (!ProcessBlock(state, NULL, pblock))
-            return error("MyriadcoinMiner : ProcessBlock, block not accepted");
+            return error("NeosCoinMiner : ProcessBlock, block not accepted");
     }
 
     return true;
@@ -4720,7 +4776,7 @@ void static BitcoinMiner(CWallet *pwallet)
     CReserveKey reservekey(pwallet);
     unsigned int nExtraNonce = 0;
 
-    loop 
+    while (true)
     {
         MinerWaitOnline();
 
@@ -4760,7 +4816,7 @@ void static BitcoinMiner(CWallet *pwallet)
         uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
         uint256 hashbuf[2];
         uint256& hash = *alignup<16>(hashbuf);
-        loop
+       while (true)
         {
             unsigned int nHashesDone = 0;
             unsigned int nNonceFound;
@@ -4847,145 +4903,13 @@ void static BitcoinMiner(CWallet *pwallet)
     } 
 }
 
-void static ScryptMiner(CWallet *pwallet)
-{
-    // Each thread has its own key and counter
-    CReserveKey reservekey(pwallet);
-    unsigned int nExtraNonce = 0;
-
-    loop
-    {
-        MinerWaitOnline();
-        
-        //
-        // Create new block
-        //
-        unsigned int nTransactionsUpdatedLast = nTransactionsUpdated;
-        CBlockIndex* pindexPrev = pindexBest;
-
-        auto_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(reservekey, ALGO_SCRYPT));
-        if (!pblocktemplate.get())
-            return;
-        CBlock *pblock = &pblocktemplate->block;
-        IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
-            
-        printf("Running scrypt miner with %"PRIszu" transactions in block (%u bytes)\n", pblock->vtx.size(),
-               ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION));
-
-        //
-        // Prebuild hash buffers
-        //
-        char pmidstatebuf[32+16]; char* pmidstate = alignup<16>(pmidstatebuf);
-        char pdatabuf[128+16];    char* pdata     = alignup<16>(pdatabuf);
-        char phash1buf[64+16];    char* phash1    = alignup<16>(phash1buf);
-
-        FormatHashBuffers(pblock, pmidstate, pdata, phash1);
-
-        unsigned int& nBlockTime = *(unsigned int*)(pdata + 64 + 4);
-        unsigned int& nBlockBits = *(unsigned int*)(pdata + 64 + 8);
-
-        //
-        // Search
-        //
-        int64 nStart = GetTime();
-        uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
-        loop
-        {
-            unsigned int nHashesDone = 0;
-            uint256 thash;
-            char scratchpad[SCRYPT_SCRATCHPAD_SIZE];
-            loop
-            {
-#if defined(USE_SSE2)
-                // Detection would work, but in cases where we KNOW it always has SSE2,
-                // it is faster to use directly than to use a function pointer or conditional.
-#if defined(_M_X64) || defined(__x86_64__) || defined(_M_AMD64) || (defined(MAC_OSX) && defined(__i386__))
-                // Always SSE2: x86_64 or Intel MacOS X
-                scrypt_1024_1_1_256_sp_sse2(BEGIN(pblock->nVersion), BEGIN(thash), scratchpad);
-#else
-                // Detect SSE2: 32bit x86 Linux or Windows
-                scrypt_1024_1_1_256_sp(BEGIN(pblock->nVersion), BEGIN(thash), scratchpad);
-#endif
-#else
-                // Generic scrypt
-                scrypt_1024_1_1_256_sp_generic(BEGIN(pblock->nVersion), BEGIN(thash), scratchpad);
-#endif
-
-                if (thash <= hashTarget)
-                {
-                    // Found a solution
-                    SetThreadPriority(THREAD_PRIORITY_NORMAL);
-                    CheckWork(pblock, *pwalletMain, reservekey);
-                    SetThreadPriority(THREAD_PRIORITY_LOWEST);
-                    break;
-                }
-                pblock->nNonce += 1;
-                nHashesDone += 1;
-                if ((pblock->nNonce & 0xFF) == 0)
-                    break;
-            }
-
-            // Meter hashes/sec
-            static int64 nHashCounter;
-            if (nHPSTimerStart == 0)
-            {
-                nHPSTimerStart = GetTimeMillis();
-                nHashCounter = 0;
-            }
-            else
-                nHashCounter += nHashesDone;
-            if (GetTimeMillis() - nHPSTimerStart > 4000)
-            {
-                static CCriticalSection cs;
-                {
-                    LOCK(cs);
-                    if (GetTimeMillis() - nHPSTimerStart > 4000)
-                    {
-                        dHashesPerSec = 1000.0 * nHashCounter / (GetTimeMillis() - nHPSTimerStart);
-                        nHPSTimerStart = GetTimeMillis();
-                        nHashCounter = 0;
-                        static int64 nLogTime;
-                        if (GetTime() - nLogTime > 30 * 60)
-                        {
-                            nLogTime = GetTime();
-                            printf("hashmeter %6.0f khash/s\n", dHashesPerSec/1000.0);
-                        }
-                    }
-                }
-            }
-
-            // Check for stop or if block needs to be rebuilt
-            boost::this_thread::interruption_point();
-            if (vNodes.empty() && Params().NetworkID() != CChainParams::REGTEST)
-                break;
-            if (pblock->nNonce >= 0xffff0000)
-                break;
-            if (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 60)
-                break;
-            if (pindexPrev != pindexBest)
-                break;
-
-            // Update nTime every few seconds
-            UpdateTime(*pblock, pindexPrev);
-            nBlockTime = ByteReverse(pblock->nTime);
-            if (TestNet())
-            {
-                // Changing pblock->nTime can change work required on testnet:
-                nBlockBits = ByteReverse(pblock->nBits);
-                hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
-            }
-            
-        }
-    }
-}
-
 void static GenericMiner(CWallet *pwallet, int algo)
 {
     // Each thread has its own key and counter
     CReserveKey reservekey(pwallet);
     unsigned int nExtraNonce = 0;
 
-    loop 
+    while (true)
     {
         MinerWaitOnline();
 
@@ -5012,13 +4936,20 @@ void static GenericMiner(CWallet *pwallet, int algo)
         uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
         int64 nStart = GetTime();
         uint256 hash;
-        loop
+
+        pblock->nNonce = GetRand(0xffffffffff);
+
+        while (true)
         {
+            unsigned int nHashesDone = 0;
+
+            for(int i = 0; i < 1000; i++)
+            {
+
             hash = pblock->GetPoWHash(algo);
             if (hash <= hashTarget){
                 SetThreadPriority(THREAD_PRIORITY_NORMAL);
 
-                printf("proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex().c_str(), hashTarget.GetHex().c_str());
                 pblock->print();
 
                 CheckWork(pblock, *pwalletMain, reservekey);
@@ -5026,7 +4957,12 @@ void static GenericMiner(CWallet *pwallet, int algo)
                 break;
             }
             ++pblock->nNonce;
-            
+
+            nHashesDone++;
+            }
+            if (hash <= hashTarget){break;}
+
+
             // Meter hashes/sec
             static int64 nHashCounter;
             if (nHPSTimerStart == 0)
@@ -5035,7 +4971,9 @@ void static GenericMiner(CWallet *pwallet, int algo)
                 nHashCounter = 0;
             }
             else
-                nHashCounter += 1;
+                 nHashCounter += nHashesDone;
+
+
             if (GetTimeMillis() - nHPSTimerStart > 4000)
             {
                 static CCriticalSection cs;
@@ -5082,36 +5020,52 @@ void static GenericMiner(CWallet *pwallet, int algo)
 
 void static ThreadBitcoinMiner(CWallet *pwallet)
 {
-    printf("Myriadcoin miner started\n");
+    printf("NeosCoin miner started\n");
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
     RenameThread("bitcoin-miner");
     
-    try 
-    {
-        switch (miningAlgo)
+    if (pindexBest->nHeight < DIFF_SWITCH_BLOCK) 
         {
-            case ALGO_SHA256D:
-                BitcoinMiner(pwallet);
-                break;
-            case ALGO_SCRYPT:
-                ScryptMiner(pwallet);
-                break;
-            case ALGO_GROESTL:
-                GenericMiner(pwallet, ALGO_GROESTL);
-                break;
-            case ALGO_SKEIN:
-                GenericMiner(pwallet, ALGO_SKEIN);
-                break;
-            case ALGO_QUBIT:
-                GenericMiner(pwallet, ALGO_QUBIT);
-                break;
+            try 
+            {
+                switch (miningAlgo)
+                {
+                    case ALGO_SHA256D:
+                        BitcoinMiner(pwallet);
+                        break;
+                }
+            }
+            catch (boost::thread_interrupted)
+            {
+                printf("NeosCoin miner terminated\n");
+                throw;
+            }
+            
         }
-    }
-    catch (boost::thread_interrupted)
-    {
-        printf("Myriadcoin miner terminated\n");
-        throw;
-    }
+        else
+        {
+            try 
+            {
+                switch (miningAlgo)
+                {
+                    case ALGO_SHA256D:
+                        BitcoinMiner(pwallet);
+                        break;
+                    case ALGO_X11:
+                        GenericMiner(pwallet, ALGO_X11);
+                        break;
+                    case ALGO_BLAKE:
+                        GenericMiner(pwallet, ALGO_BLAKE);
+                        break;
+                }
+            }
+            catch (boost::thread_interrupted)
+            {
+                printf("NeosCoin miner terminated\n");
+                throw;
+            }
+           
+        }
 }
 
 void GenerateBitcoins(bool fGenerate, CWallet* pwallet)
