@@ -27,7 +27,7 @@ public:
         pchMessageStart[1] = 0x08;
         pchMessageStart[2] = 0x07;
         pchMessageStart[3] = 0x06;
-        vAlertPubKey = ParseHex("");
+        vAlertPubKey = ParseHex("0409dc41c6f379a0adae42d79981ca85ca7e954e6a5361369622f5a4a77bce4054b1b16ee3424251d0b6bcf6029ef24939cfd1c9d7ce80e204c2f6a26cb32cd68d");
         nDefaultPort = 15005;
         nRPCPort = 15004;
         bnProofOfWorkLimit[ALGO_SHA256D] = CBigNum(~uint256(0) >> 20);
@@ -45,7 +45,7 @@ public:
         txNew.vout.resize(1);
         txNew.vin[0].scriptSig = CScript() << 486604799 << CBigNum(4) << vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
         txNew.vout[0].nValue = 1000 * COIN;
-        txNew.vout[0].scriptPubKey = CScript() << ParseHex("") << OP_CHECKSIG;
+        txNew.vout[0].scriptPubKey = CScript() << ParseHex("04d9f4745d7928e1622075cda22153d37022632c42bb893faf6b41e4d5795efe631acc437998b84406f51fd6b1bc78b3dcd8f4ac102e3ed9f30791d5d2e0d7842c") << OP_CHECKSIG;
         genesis.vtx.push_back(txNew);
         genesis.hashPrevBlock = 0;
         genesis.hashMerkleRoot = genesis.BuildMerkleTree();
@@ -54,24 +54,13 @@ public:
         genesis.nBits    = 0x1e0fffff;
         genesis.nNonce   = 115324;
         
-        //// debug print
         hashGenesisBlock = genesis.GetHash();
-        while (hashGenesisBlock > bnProofOfWorkLimit[ALGO_SHA256D].getuint256()){
-            if (++genesis.nNonce==0) break;
-            hashGenesisBlock = genesis.GetHash();
-        }
-
-        printf("MAIN: %s\n", hashGenesisBlock.ToString().c_str());
-        printf("%s\n", genesis.hashMerkleRoot.ToString().c_str());
-        printf("%x\n", bnProofOfWorkLimit[ALGO_SHA256D].GetCompact());
-        genesis.print();
        
         assert(hashGenesisBlock == uint256("0x0000022ee1a967feebc7958b1328baafca7d980eb75a01a301f1fb03091d49b0"));
         assert(genesis.hashMerkleRoot == uint256("0x7ae8cebed5aadfc0518b7397efca8638ea1d2e7f3aa9bad6da9cb1b9bf47a406"));
 
         vSeeds.push_back(CDNSSeedData("", ""));
         vSeeds.push_back(CDNSSeedData("", ""));
-
 
         base58Prefixes[PUBKEY_ADDRESS] = 63; 
         base58Prefixes[SCRIPT_ADDRESS] = 5;
@@ -124,17 +113,8 @@ public:
         // Modify the testnet genesis block so the timestamp is valid for a later start.
         genesis.nTime = 1407194501;
         genesis.nNonce = 1237446;
-        
-        //// debug print
-        hashGenesisBlock = genesis.GetHash();
-        while (hashGenesisBlock > bnProofOfWorkLimit[ALGO_SHA256D].getuint256()){
-            if (++genesis.nNonce==0) break;
-           hashGenesisBlock = genesis.GetHash();
-        }
 
-        printf("TEST: %s\n", hashGenesisBlock.ToString().c_str());
-        printf("%s\n", genesis.hashMerkleRoot.ToString().c_str());
-        genesis.print();
+        hashGenesisBlock = genesis.GetHash();
         
         assert(hashGenesisBlock == uint256("0x000002627345a712659eb5e72af2129c19f90b4bd4e531943d1d13a166379855"));
 
@@ -173,20 +153,9 @@ public:
         nDefaultPort = 15000;
         strDataDir = "regtest";
         
-        //// debug print
-        hashGenesisBlock = genesis.GetHash();
-/*        while (hashGenesisBlock > bnProofOfWorkLimit[ALGO_SHA256D].getuint256()){
-            if (++genesis.nNonce==0) break;
-            hashGenesisBlock = genesis.GetHash();
-        }
-
-        printf("REG: %s\n", hashGenesisBlock.ToString().c_str());
-        printf("%s\n", genesis.hashMerkleRoot.ToString().c_str());
-        genesis.print();
-*/
         assert(hashGenesisBlock == uint256("0x776e00fc8416a46e0312c6e1ad74db82c7864060c2cf79df85135a0889074920"));
 
-        vSeeds.clear();  // Regtest mode doesn't have any DNS seeds.
+        vSeeds.clear();  
 
         base58Prefixes[PUBKEY_ADDRESS] = 0;
         base58Prefixes[SCRIPT_ADDRESS] = 5;
